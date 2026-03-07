@@ -39,7 +39,7 @@ config_data = {
 }
 admin.upload_qcsetup_config_file(
     qcsetup_name="qc1",
-    config_data=config_data
+    data=config_data
 )
 
 # Download QCSetup config files
