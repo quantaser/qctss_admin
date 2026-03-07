@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qctss-admin"
+version = "0.1.0"
+description = "QCTSS Admin SDK for quantum computing resource administration"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Quantaser Photonics", email = "tina@quantaser.com"},
+]
+maintainers = [
+     {name = "Quantaser Photonics", email = "tina@quantaser.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Software Development :: Libraries :: Python Modules", 
+    "Topic :: System :: Systems Administration",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["quantum", "computing", "sdk", "qctss", "admin", "billing"]
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/qctss/qctss-admin"
+Documentation = "https://docs.qctss.com/admin"
+Repository = "https://github.com/qctss/qctss-admin"
+"Bug Tracker" = "https://github.com/qctss/qctss-admin/issues"
+
+[project.scripts]
+qctss-admin = "qctss_admin.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["qctss_admin*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
