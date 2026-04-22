@@ -50,11 +50,6 @@ def main() -> int:
         help="Output file path (default: print to stdout)"
     )
     
-    # Billing summary command
-    summary_parser = subparsers.add_parser("billing-summary", help="Get billing summary")
-    summary_parser.add_argument("year", type=int, help="Billing year")
-    summary_parser.add_argument("month", type=int, help="Billing month (1-12)")
-    
     args = parser.parse_args()
     
     if not args.command:
@@ -81,19 +76,6 @@ def main() -> int:
                     print(f"Billing CSV saved to: {result}")
                 else:
                     print(result)  # Print CSV content
-                    
-            except (InvalidBillingPeriodError, BillingClientError) as e:
-                print(f"Billing error: {e}", file=sys.stderr)
-                return 1
-        
-        elif args.command == "billing-summary":
-            # Get billing summary
-            try:
-                summary = admin.get_billing_summary(args.year, args.month)
-                
-                print(f"Billing Summary for {args.year}-{args.month:02d}:")
-                for key, value in summary.items():
-                    print(f"  {key}: {value}")
                     
             except (InvalidBillingPeriodError, BillingClientError) as e:
                 print(f"Billing error: {e}", file=sys.stderr)

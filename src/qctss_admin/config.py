@@ -77,6 +77,16 @@ class BackendConfig:
         if self.retry_delay < 0:
             raise ValueError("Retry delay cannot be negative")
     
+    @property
+    def websocket_url(self) -> str:
+        """WebSocket URL (derived from fastapi_url, always ws:// or wss://)"""
+        url = self.fastapi_url
+        if url.startswith("http://"):
+            url = "ws://" + url[len("http://"):]
+        elif url.startswith("https://"):
+            url = "wss://" + url[len("https://"):]
+        return url.rstrip("/")
+
     def get_api_url(self, endpoint: str) -> str:
         """
         Get full API URL for an endpoint

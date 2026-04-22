@@ -1,6 +1,6 @@
 # QCTSS Admin SDK
 
-A Python SDK for administrative operations on the QCTSS (Quantum Computing Time-Sharing System) platform.
+A Python SDK for administrative operations on the QCTSS (Quantum Computing Test Space Scheduler) platform.
 
 ## Installation
 
@@ -8,82 +8,81 @@ A Python SDK for administrative operations on the QCTSS (Quantum Computing Time-
 pip install git+https://github.com/quantaser/qctss_admin.git
 ```
 
+For development installation:
+
+```bash
+git clone https://github.com/quantaser/qctss_admin.git
+cd qctss_admin
+pip install -e ".[dev]"
+```
+
 ## Quick Start
 
 ```python
+from pathlib import Path
 from qctss_admin import QCTSSAdmin
 
 # Initialize admin client (requires admin token)
-admin = QCTSSAdmin(
-    admin_token="your-admin-token",
-)
+admin = QCTSSAdmin(admin_token="your-admin-token")
 
+# Check existing jobs — useful to detect stale queued/running jobs from previous sessions
+job_statuses = admin.get_my_jobs_status()
+if job_statuses:
+    print("Existing active jobs:")
+    for s in job_statuses:
+        print(f"  Job {s.job_id:>6}  status={s.status:<12}  service={s.service_name}  qc_setups={s.qc_setup_list}")
+else:
+    print("No active jobs.")
 
-# Upload QCSetup config (supports dict/str/Path)
-config_data = {
-    "qubits":{
-        "q0":{
-            "id":"q0",
-            "operations":{
-                            "x180_DragCosine": {
-                            "length": 32,
-                            "digital_marker": "ON",
-                            "axis_angle": 0,
-                            "amplitude": 0.1,
-                            "alpha": 0.0,
-                            "anharmonicity": "#/qubits/q0/anharmonicity",
-                            "__class__": "quam.components.pulses.DragCosinePulse"
-                        },
-            }
-        }}
-}
+DOWNLOAD_DIR = Path("C:/Data/qctss")
+
+# Upload QCSetup config and wiring (admin only)
 admin.upload_qcsetup_config_file(
     qcsetup_name="qc1",
-    data=config_data
+    data=Path("/data/configs/qc1_config.json"),
+)
+admin.upload_qcsetup_wiring(
+    qcsetup_name="qc1",
+    data=Path("/data/wirings/qc1_wiring.json"),
 )
 
-# Download QCSetup config files
-configs = admin.download_qcsetup_config_file(
-    qcsetup_names=["qc1", "qc2", "qc3"]
-)
-for name, config in configs.items():
-    print(f"{name}: {config}")
+# Batch upload configs
+admin.upload_qcsetup_config_files(paths={
+    "qc1": Path("/data/configs/qc1_config.json"),
+    "qc2": Path("/data/configs/qc2_config.json"),
+})
+
+# Batch upload wirings
+admin.upload_qcsetup_wirings(paths={
+    "qc1": Path("/data/wirings/qc1_wiring.json"),
+    "qc2": Path("/data/wirings/qc2_wiring.json"),
+})
+
+# Download QCSetup config files (saved to specified absolute paths)
+admin.download_qcsetup_config_file(paths={
+    "qc1": DOWNLOAD_DIR / "qc1_config.json",
+    "qc2": DOWNLOAD_DIR / "qc2_config.json",
+})
 
 # Download QCSetup wiring files
-wirings = admin.download_qcsetup_wiring(
-    qcsetup_names=["qc1", "qc2"]
-)
+admin.download_qcsetup_wiring(paths={
+    "qc1": DOWNLOAD_DIR / "qc1_wiring.json",
+    "qc2": DOWNLOAD_DIR / "qc2_wiring.json",
+})
 
-# Download billing CSV
+# Download billing CSV (in-memory)
 csv_content = admin.download_billing_csv(year=2026, month=1)
 print(csv_content)
 
-# Save to file
+# Download billing CSV (save to file)
 csv_path = admin.download_billing_csv(
-    year=2026, 
-    month=1, 
-    output_file="billing_2026_01.csv"
+    year=2026,
+    month=1,
+    output_file="billing_2026_01.csv",
 )
 print(f"Saved to: {csv_path}")
 
-# Get billing summary
-summary = admin.get_billing_summary(year=2026, month=1)
-print(f"Total cost: ${summary.get('total_cost', 0):.2f}")
-
 admin.close()
-```
-```
-### Programmatic Configuration
-
-```python
-from qctss_admin import QCTSSAdmin
-
-admin = QCTSSAdmin(
-    admin_token="your-admin-token",
-    timeout=30,
-    max_retries=3,
-    retry_delay=5
-)
 ```
 
 ## API Reference
@@ -95,7 +94,7 @@ admin = QCTSSAdmin(
 ```python
 QCTSSAdmin(
     admin_token: str,
-    backend_url: Optional[str] = None,
+    fastapi_url: Optional[str] = None,
     timeout: Optional[int] = None,
     max_retries: Optional[int] = None,
     retry_delay: Optional[int] = None
@@ -103,68 +102,69 @@ QCTSSAdmin(
 ```
 
 - `admin_token`: Admin API authentication token (required, must be type='admin')
-- `backend_url`: Backend API URL (overrides env config)
+- `fastapi_url`: FastAPI server URL (overrides build-time config, e.g. `ws://host:8001`)
 - `timeout`: Request timeout in seconds (default: 30)
 - `max_retries`: Max retry attempts (default: 3)
 - `retry_delay`: Delay between retries (default: 5)
 
-**Raises**: 
+**Raises**:
 - `AuthenticationError`: If token is invalid or not admin-level
 
 #### download_qcsetup_config_file
 
 ```python
 download_qcsetup_config_file(
-    qcsetup_names: List[str]
-) -> Dict[str, dict]
+    paths: Dict[str, Path]
+) -> None
 ```
 
-Download QCSetup config files for multiple QCSetups.
+Download QCSetup config files and save each to the specified absolute path.
 
 **Parameters**:
-- `qcsetup_names`: List of QCSetup names (non-empty)
+- `paths`: `{qcsetup_name: absolute_path}` mapping
 
-**Returns**: Dict[str, dict] - key=QCSetup name, value=parsed config dict
+**Returns**: `None` (files are written to the paths specified in `paths`)
 
 **Raises**:
-- `QCSetupNotActiveError`: QCSetup status is not 'active' (403)
+- `ValueError`: Any path is not absolute
+- `QCSetupConfigNotFoundError`: QCSetup exists but has no activated config
 - `QCSetupNotFoundError`: QCSetup doesn't exist (404)
 - `AuthenticationError`: Invalid or non-admin token
-- `TimeoutError`: Request timed out
 
 **Example**:
 ```python
-configs = admin.download_qcsetup_config_file(["qc1", "qc2", "qc3"])
-for name, config in configs.items():
-    print(f"{name}: {config}")
+admin.download_qcsetup_config_file(paths={
+    "qc1": Path("/data/qc1_config.json"),
+    "qc2": Path("/data/qc2_config.json"),
+})
 ```
 
 #### download_qcsetup_wiring
 
 ```python
 download_qcsetup_wiring(
-    qcsetup_names: List[str]
-) -> Dict[str, dict]
+    paths: Dict[str, Path]
+) -> None
 ```
 
-Download QCSetup wiring files for multiple QCSetups.
+Download QCSetup wiring files and save each to the specified absolute path.
 
 **Parameters**:
-- `qcsetup_names`: List of QCSetup names (non-empty)
+- `paths`: `{qcsetup_name: absolute_path}` mapping
 
-**Returns**: Dict[str, dict] - key=QCSetup name, value=parsed wiring dict
+**Returns**: `None` (files are written to the paths specified in `paths`)
 
 **Raises**:
-- `QCSetupNotActiveError`: QCSetup status is not 'active' (403)
+- `ValueError`: Any path is not absolute
 - `QCSetupNotFoundError`: QCSetup doesn't exist (404)
 - `AuthenticationError`: Invalid or non-admin token
-- `TimeoutError`: Request timed out
 
 **Example**:
 ```python
-wirings = admin.download_qcsetup_wiring(["qc1", "qc2"])
-for name, wiring in wirings.items():
-    print(f"{name}: {wiring}")
+admin.download_qcsetup_wiring(paths={
+    "qc1": Path("/data/qc1_wiring.json"),
+    "qc2": Path("/data/qc2_wiring.json"),
+})
 ```
 
 #### upload_qcsetup_config_file
@@ -172,36 +172,57 @@ for name, wiring in wirings.items():
 ```python
 upload_qcsetup_config_file(
     qcsetup_name: str,
-    config_data: Union[dict, str, Path]
-) -> None
+    data: Path,
+) -> dict
 ```
 
-Upload QCSetup config file for a single QCSetup.
+Upload a QCSetup config file from an absolute path.
 
 **Parameters**:
-- `qcsetup_name`: Single QCSetup name (non-empty string)
-- `config_data`: Config data (supports dict, JSON string, or Path to file)
+- `qcsetup_name`: QCSetup name (non-empty string)
+- `data`: Absolute path to a JSON file
+
+**Returns**: Backend response JSON
 
 **Raises**:
+- `ValueError`: Path is not absolute
 - `QCSetupNotActiveError`: QCSetup status is not 'active' (403)
 - `QCSetupNotFoundError`: QCSetup doesn't exist (404)
 - `AuthenticationError`: Invalid or non-admin token
-- `ValueError`: Invalid JSON format
-- `TimeoutError`: Request timed out
 
 **Example**:
 ```python
-from pathlib import Path
+admin.upload_qcsetup_config_file(
+    qcsetup_name="qc1",
+    data=Path("/data/configs/qc1_config.json"),
+)
+```
 
-# Method 1: Using dict
-config_data = {"key": "value", "sensors": [...]}
-admin.upload_qcsetup_config_file("qc1", config_data)
+#### upload_qcsetup_config_files
 
-# Method 2: Using JSON string
-admin.upload_qcsetup_config_file("qc1", '{"key": "value"}')
+```python
+upload_qcsetup_config_files(
+    paths: Dict[str, Path],
+) -> Dict[str, dict]
+```
 
-# Method 3: Using Path
-admin.upload_qcsetup_config_file("qc1", Path("./config.json"))
+Batch-upload config files for multiple QCSetups.
+
+**Parameters**:
+- `paths`: `{qcsetup_name: absolute_path}` mapping
+
+**Returns**: `Dict[str, dict]` — key=QCSetup name, value=backend response JSON
+
+**Raises**:
+- `ValueError`: Any path is not absolute
+- `QCSetupNotActiveError`, `QCSetupNotFoundError`, `AuthenticationError`
+
+**Example**:
+```python
+admin.upload_qcsetup_config_files(paths={
+    "qc1": Path("/data/configs/qc1_config.json"),
+    "qc2": Path("/data/configs/qc2_config.json"),
+})
 ```
 
 #### upload_qcsetup_wiring
@@ -209,27 +230,57 @@ admin.upload_qcsetup_config_file("qc1", Path("./config.json"))
 ```python
 upload_qcsetup_wiring(
     qcsetup_name: str,
-    wiring_data: Union[dict, str, Path]
-) -> None
+    data: Path,
+) -> dict
 ```
 
-Upload QCSetup wiring file for a single QCSetup.
+Upload a QCSetup wiring file from an absolute path.
 
 **Parameters**:
-- `qcsetup_name`: Single QCSetup name (non-empty string)
-- `wiring_data`: Wiring data (supports dict, JSON string, or Path to file)
+- `qcsetup_name`: QCSetup name (non-empty string)
+- `data`: Absolute path to a JSON file
+
+**Returns**: Backend response JSON
 
 **Raises**:
+- `ValueError`: Path is not absolute
 - `QCSetupNotActiveError`: QCSetup status is not 'active' (403)
 - `QCSetupNotFoundError`: QCSetup doesn't exist (404)
 - `AuthenticationError`: Invalid or non-admin token
-- `ValueError`: Invalid JSON format
-- `TimeoutError`: Request timed out
 
 **Example**:
 ```python
-wiring_data = {"connections": [...]}
-admin.upload_qcsetup_wiring("qc1", wiring_data)
+admin.upload_qcsetup_wiring(
+    qcsetup_name="qc1",
+    data=Path("/data/wirings/qc1_wiring.json"),
+)
+```
+
+#### upload_qcsetup_wirings
+
+```python
+upload_qcsetup_wirings(
+    paths: Dict[str, Path],
+) -> Dict[str, dict]
+```
+
+Batch-upload wiring files for multiple QCSetups.
+
+**Parameters**:
+- `paths`: `{qcsetup_name: absolute_path}` mapping
+
+**Returns**: `Dict[str, dict]` — key=QCSetup name, value=backend response JSON
+
+**Raises**:
+- `ValueError`: Any path is not absolute
+- `QCSetupNotActiveError`, `QCSetupNotFoundError`, `AuthenticationError`
+
+**Example**:
+```python
+admin.upload_qcsetup_wirings(paths={
+    "qc1": Path("/data/wirings/qc1_wiring.json"),
+    "qc2": Path("/data/wirings/qc2_wiring.json"),
+})
 ```
 
 #### download_billing_csv
@@ -237,9 +288,9 @@ admin.upload_qcsetup_wiring("qc1", wiring_data)
 ```python
 download_billing_csv(
     year: int,
-    month: int, 
+    month: int,
     output_file: Optional[Union[str, Path]] = None
-) -> Union[str, str]
+) -> str
 ```
 
 Download billing CSV for specified period.
@@ -259,110 +310,149 @@ Download billing CSV for specified period.
 - `TimeoutError`: Request timed out
 - `IOError`: File write error (if output_file provided)
 
-#### get_billing_summary
+---
+
+## Job Management
+
+Admin users can manage jobs with the same scope as regular users (own jobs only).
+These methods mirror the `qctss-client` job API.
+
+#### start_job
 
 ```python
-get_billing_summary(year: int, month: int) -> Dict[str, Any]
+start_job(qc_setup_list: List[str], service_name: str) -> JobResponse
 ```
 
-Get billing summary statistics for specified period.
+**Parameters**:
+- `qc_setup_list`: List of QC setup names (non-empty strings)
+- `service_name`: Name of the service to use
+
+**Returns**: `JobResponse` with `job_id` and `status`
+
+#### get_my_jobs_status
+
+```python
+get_my_jobs_status() -> List[JobStatus]
+```
+
+**Returns**: List of `JobStatus` objects for the current admin user's jobs
+
+#### close_job
+
+```python
+close_job(job_id: int) -> JobResponse
+```
 
 **Parameters**:
-- `year`: Billing year (>= 2000, <= 3000) 
-- `month`: Billing month (1-12)
+- `job_id`: Job ID to close (positive integer)
 
-**Returns**: Dictionary with billing summary data
+**Returns**: `JobResponse` with updated status (`completed`)
 
-**Raises**:
-- `InvalidBillingPeriodError`: Invalid year/month
-- `AuthenticationError`: Invalid or non-admin token
-- `TimeoutError`: Request timed out
+#### cancel_job
 
-### Billing Functions Comparison
+```python
+cancel_job(job_id: int, reason: Optional[str] = None) -> JobResponse
+```
 
-This SDK provides two billing-related functions with different purposes:
+**Parameters**:
+- `job_id`: Job ID to cancel
+- `reason`: Reason for cancellation (default: `"User cancelled job"`)
 
-#### `download_billing_csv(year, month, output_file=None)`
-- **Purpose**: Download raw billing CSV data
-- **Returns**: 
-  - If `output_file` is `None`: CSV string (str)
-  - If `output_file` provided: File path where CSV was saved (Path)
-- **Use Case**: Need detailed records, export reports, further analysis
-- **Endpoint**: `GET /api/export/billing-csv/`
-- **Example**:
-  ```python
-  # Get CSV string
-  csv_data = admin.download_billing_csv(year=2024, month=3)
-  print(csv_data)
-  
-  # Save to file
-  csv_path = admin.download_billing_csv(
-      year=2024, 
-      month=3, 
-      output_file="billing_2024_03.csv"
-  )
-  ```
+**Returns**: `JobResponse` with updated status (`cancelled`)
 
-#### `get_billing_summary(year, month)`
-- **Purpose**: Get billing summary statistics
-- **Returns**: dict (contains aggregated statistics)
-- **Use Case**: Quick overview, dashboard display
-- **Endpoint**: `GET /api/billing/summary/`
-- **Example**:
-  ```python
-  summary = admin.get_billing_summary(year=2024, month=3)
-  print(f"Total usage: {summary['total_usage']}")
-  print(f"Total cost: {summary['total_cost']}")
-  ```
+#### wait_until_running
+
+```python
+wait_until_running(
+    job_id: int,
+    timeout: Optional[int] = None,
+    on_status: Optional[Callable[[JobStatus], None]] = None,
+) -> int
+```
+
+Wait for a job to reach `running` state. Press `Ctrl+C` to cancel waiting.
+
+**Parameters**:
+- `job_id`: Job ID to monitor
+- `timeout`: Max seconds to wait (None = wait forever)
+- `on_status`: Optional callback for status updates while waiting
+
+**Returns**: Port number assigned when job is running
+
+**Example**:
+```python
+from qctss_admin import (
+    QCTSSAdmin,
+    JobNotFoundError, InvalidJobStateError,
+    WebSocketError, TimeoutError,
+)
+
+admin = QCTSSAdmin(admin_token="admin-token")
+
+try:
+    job = admin.start_job(qc_setup_list=["qc_setup_A"], service_name="my_service")
+    port = admin.wait_until_running(job.job_id, timeout=300)
+    print(f"Job running on port: {port}")
+    admin.close_job(job.job_id)
+except TimeoutError:
+    admin.cancel_job(job.job_id, reason="Timeout during wait")
+except KeyboardInterrupt:
+    admin.cancel_job(job.job_id, reason="User interrupted")
+finally:
+    admin.close()
+```
+
+---
 
 ## Error Handling
 
-The SDK provides comprehensive error handling with custom exceptions:
-
 ### Exception Types
 
-- **`AuthenticationError`**: Authentication failed (invalid token, non-admin token)
+- **`AuthenticationError`**: Authentication failed (invalid or non-admin token)
 - **`QCSetupNotActiveError`**: QCSetup status is not 'active' (403)
 - **`QCSetupNotFoundError`**: QCSetup doesn't exist (404)
+- **`QCSetupConfigNotFoundError`**: QCSetup exists but has no activated config
 - **`InvalidBillingPeriodError`**: Invalid year/month values
 - **`TimeoutError`**: Request timed out
+- **`ValidationError`**: Invalid request parameters
+- **`JobClientError`**: General job operation error
+- **`JobNotFoundError`**: Job not found (404)
+- **`InvalidJobStateError`**: Job cannot perform the operation in current state (409)
+- **`WebSocketError`**: WebSocket error (base class)
+- **`WebSocketConnectionError`**: WebSocket connection failed
+- **`WebSocketAuthError`**: WebSocket authentication failed
 
 ### Example
 
 ```python
+from pathlib import Path
 from qctss_admin import (
-    QCTSSAdmin, 
+    QCTSSAdmin,
     AuthenticationError,
     QCSetupNotActiveError,
     QCSetupNotFoundError,
+    QCSetupConfigNotFoundError,
     InvalidBillingPeriodError,
-    TimeoutError
+    TimeoutError,
 )
 
 try:
     admin = QCTSSAdmin(admin_token="admin-token")
-    
-    # Download QCSetup configs
-    configs = admin.download_qcsetup_config_file(["qc1", "archived_qc"])
-    
-    # Download billing data
+    admin.download_qcsetup_config_file(paths={"qc1": Path("/data/qc1_config.json")})
     csv_data = admin.download_billing_csv(2026, 1)
-    
+
 except AuthenticationError as e:
     print(f"Access denied: {e}")
-    
 except QCSetupNotActiveError as e:
     print(f"QCSetup is not active: {e}")
-    
+except QCSetupConfigNotFoundError as e:
+    print(f"QCSetup has no activated config: {e}")
 except QCSetupNotFoundError as e:
     print(f"QCSetup not found: {e}")
-    
 except InvalidBillingPeriodError as e:
     print(f"Invalid period: {e}")
-    
 except TimeoutError as e:
     print(f"Timeout: {e}")
-    
 finally:
     admin.close()
 ```
@@ -374,4 +464,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 - Email: tina@quantaser.com
-- Issues: [GitHub Issues](https://github.com/qctss/qctss-admin/issues)
+- Issues: [GitHub Issues](https://github.com/quantaser/qctss_admin/issues)
