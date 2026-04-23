@@ -30,6 +30,7 @@ keywords = ["quantum", "computing", "sdk", "qctss", "admin", "billing"]
 requires-python = ">=3.9"
 dependencies = [
     "requests>=2.28.0",
+    "websocket-client>=1.2.0",
     "pydantic>=2.0.0",
 ]
 
@@ -42,16 +43,16 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/qctss/qctss-admin"
+Homepage = "https://github.com/quantaser/qctss-admin"
 Documentation = "https://docs.qctss.com/admin"
-Repository = "https://github.com/qctss/qctss-admin"
-"Bug Tracker" = "https://github.com/qctss/qctss-admin/issues"
+Repository = "https://github.com/quantaser/qctss-admin"
+"Bug Tracker" = "https://github.com/quantaser/qctss-admin/issues"
 
 [project.scripts]
 qctss-admin = "qctss_admin.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["qctss_admin*"]
 
 [tool.black]
