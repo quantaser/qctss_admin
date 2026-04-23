@@ -20,6 +20,20 @@ class QCTSSAdminError(Exception):
         self.backend_message = backend_message
         self.details = details or {}
 
+    def __str__(self) -> str:
+        parts = [self.message]
+
+        if self.http_status:
+            parts.append(f"HTTP {self.http_status}")
+
+        if self.error_code:
+            parts.append(f"Code: {self.error_code}")
+
+        if self.backend_message:
+            parts.append(f"Backend: {self.backend_message}")
+
+        return " | ".join(parts)
+
 class PermissionError(QCTSSAdminError):
     """Raised when admin permissions are required but not available"""
     pass
