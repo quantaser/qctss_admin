@@ -14,7 +14,7 @@ import requests
 from .config import BackendConfig
 from .exceptions import (
     AuthenticationError, QCSetupNotActiveError, QCSetupNotFoundError, QCSetupConfigNotFoundError,
-    ValidationError, JobClientError, JobNotFoundError, InvalidJobStateError,
+    ValidationError, JobClientError, JobNotFoundError, JobFailedError, InvalidJobStateError,
     BillingClientError, InvalidBillingPeriodError, TimeoutError, PermissionError,
 )
 from .models import JobResponse, JobStatus
@@ -639,6 +639,8 @@ class QCTSSAdmin:
         final_port = [None]
         exception_holder = [None]
 
+        TERMINAL_STATES = {'cancelled', 'failed', 'timeout'}
+
         def on_status_update(status: JobStatus):
             print(f"\n[Job {job_id}] Status: {status.status}")
             if status.queue_position is not None:
@@ -661,6 +663,12 @@ class QCTSSAdmin:
                         print(f"Error during deferred disconnect for job {job_id}: {e}")
 
                 threading.Thread(target=defer_disconnect, daemon=True).start()
+            elif status.status in TERMINAL_STATES:
+                print(f"[Job {job_id}] ENDED with status '{status.status}'")
+                exception_holder[0] = JobFailedError(
+                    f"Job {job_id} ended with status '{status.status}'"
+                )
+                job_running_event.set()
 
         def on_error(error: Exception):
             logger.error(f"WebSocket error for job {job_id}: {error}")

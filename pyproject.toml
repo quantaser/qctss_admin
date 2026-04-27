@@ -44,7 +44,6 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/quantaser/qctss-admin"
-Documentation = "https://docs.qctss.com/admin"
 Repository = "https://github.com/quantaser/qctss-admin"
 "Bug Tracker" = "https://github.com/quantaser/qctss-admin/issues"
 

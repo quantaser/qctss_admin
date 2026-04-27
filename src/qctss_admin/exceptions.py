@@ -84,6 +84,11 @@ class JobNotFoundError(JobClientError):
     pass
 
 
+class JobFailedError(JobClientError):
+    """Raised when a job ends in a terminal state (cancelled/failed/timeout) before reaching running"""
+    pass
+
+
 class InvalidJobStateError(JobClientError):
     """Raised when the job cannot perform the requested operation in its current state"""
     pass
